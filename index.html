@@ -52,6 +52,39 @@
             backdrop-filter: blur(8px);
         }
         
+        .accuracy-info {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin: 5px 0;
+            flex-wrap: wrap;
+        }
+        
+        .accuracy-item {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 6px 12px;
+            border-radius: 15px;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .accuracy-good {
+            background: rgba(76, 175, 80, 0.3);
+            border: 1px solid rgba(76, 175, 80, 0.5);
+        }
+        
+        .accuracy-medium {
+            background: rgba(255, 152, 0, 0.3);
+            border: 1px solid rgba(255, 152, 0, 0.5);
+        }
+        
+        .accuracy-low {
+            background: rgba(244, 67, 54, 0.3);
+            border: 1px solid rgba(244, 67, 54, 0.5);
+        }
+        
         .current-weather-row {
             display: grid;
             grid-template-columns: 1fr;
@@ -119,6 +152,17 @@
                 font-size: 1rem;
             }
             
+            .accuracy-info {
+                flex-direction: column;
+                gap: 8px;
+                align-items: center;
+            }
+            
+            .accuracy-item {
+                width: 100%;
+                justify-content: center;
+            }
+            
             .precipitation-info {
                 flex-direction: column;
                 gap: 8px;
@@ -147,26 +191,6 @@
             position: relative;
             height: 100%;
             min-height: 200px;
-        }
-        
-        .info-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 8px;
-        }
-        
-        .info-item {
-            padding: 6px;
-            background: rgba(255, 255, 255, 0.08);
-            border-radius: 5px;
-            text-align: center;
-            font-size: 0.9rem;
-        }
-        
-        .info-value {
-            font-weight: bold;
-            font-size: 0.95rem;
-            margin-top: 2px;
         }
         
         .last-updated {
@@ -201,6 +225,10 @@
             opacity: 0.6;
             margin-top: 2px;
         }
+        
+        .accuracy-icon {
+            font-size: 1.1rem;
+        }
     </style>
 </head>
 <body>
@@ -208,6 +236,16 @@
         <header>
             <h1>Погода в районе</h1>
             <div class="location-name" id="location-name">Определение местоположения...</div>
+            <div class="accuracy-info" id="accuracy-info" style="display: none;">
+                <div class="accuracy-item" id="accuracy-value">
+                    <span class="accuracy-icon">🎯</span>
+                    <span>Точность: <span id="accuracy-meters">0</span> м</span>
+                </div>
+                <div class="accuracy-item" id="accuracy-type">
+                    <span class="accuracy-icon">📡</span>
+                    <span>Метод: <span id="location-method">определяется</span></span>
+                </div>
+            </div>
         </header>
         
         <div class="loading" id="loading">
@@ -256,6 +294,10 @@
         const errorElement = document.getElementById('error');
         const weatherDataElement = document.getElementById('weather-data');
         const locationNameElement = document.getElementById('location-name');
+        const accuracyInfoElement = document.getElementById('accuracy-info');
+        const accuracyMetersElement = document.getElementById('accuracy-meters');
+        const locationMethodElement = document.getElementById('location-method');
+        const accuracyValueElement = document.getElementById('accuracy-value');
         const currentTempElement = document.getElementById('current-temp');
         const currentDescElement = document.getElementById('current-desc');
         const precipitationValueElement = document.getElementById('precipitation-value');
@@ -266,9 +308,32 @@
         // Переменные для хранения данных
         let userLatitude = null;
         let userLongitude = null;
+        let locationAccuracy = null;
         let temperatureChart = null;
         let refreshInterval = null;
         let currentTimeIndex = null;
+        
+        // Функция для определения метода локации по точности
+        function getLocationMethod(accuracy) {
+            if (accuracy <= 20) return 'GPS (высокая точность)';
+            if (accuracy <= 100) return 'Wi-Fi/сети (средняя точность)';
+            return 'IP-адрес (низкая точность)';
+        }
+        
+        // Функция для определения класса точности
+        function getAccuracyClass(accuracy) {
+            if (accuracy <= 20) return 'accuracy-good';
+            if (accuracy <= 100) return 'accuracy-medium';
+            return 'accuracy-low';
+        }
+        
+        // Функция для обновления отображения точности
+        function updateAccuracyDisplay(accuracy) {
+            accuracyMetersElement.textContent = accuracy.toFixed(0);
+            locationMethodElement.textContent = getLocationMethod(accuracy);
+            accuracyValueElement.className = 'accuracy-item ' + getAccuracyClass(accuracy);
+            accuracyInfoElement.style.display = 'flex';
+        }
         
         // Функция для получения названия населенного пункта по координатам
         async function getLocationName(latitude, longitude) {
@@ -291,24 +356,14 @@
                 let locationName = 'Неизвестное местоположение';
                 
                 if (data.address) {
-                    // Приоритеты для названий
-                    if (data.address.city) {
-                        locationName = data.address.city;
-                    } else if (data.address.town) {
-                        locationName = data.address.town;
-                    } else if (data.address.village) {
-                        locationName = data.address.village;
-                    } else if (data.address.hamlet) {
-                        locationName = data.address.hamlet;
-                    } else if (data.address.suburb) {
-                        locationName = data.address.suburb;
-                    } else if (data.address.county) {
-                        locationName = data.address.county;
-                    } else if (data.address.state) {
-                        locationName = data.address.state;
-                    } else if (data.address.country) {
-                        locationName = data.address.country;
-                    }
+                    if (data.address.city) locationName = data.address.city;
+                    else if (data.address.town) locationName = data.address.town;
+                    else if (data.address.village) locationName = data.address.village;
+                    else if (data.address.hamlet) locationName = data.address.hamlet;
+                    else if (data.address.suburb) locationName = data.address.suburb;
+                    else if (data.address.county) locationName = data.address.county;
+                    else if (data.address.state) locationName = data.address.state;
+                    else if (data.address.country) locationName = data.address.country;
                 }
                 
                 return locationName;
@@ -324,7 +379,6 @@
             errorElement.style.display = 'block';
             errorElement.textContent = message;
             
-            // Останавливаем автообновление при ошибке
             if (refreshInterval) {
                 clearInterval(refreshInterval);
             }
@@ -342,7 +396,12 @@
                     position => {
                         userLatitude = position.coords.latitude;
                         userLongitude = position.coords.longitude;
-                        resolve({ latitude: userLatitude, longitude: userLongitude });
+                        locationAccuracy = position.coords.accuracy;
+                        resolve({ 
+                            latitude: userLatitude, 
+                            longitude: userLongitude,
+                            accuracy: locationAccuracy
+                        });
                     },
                     error => {
                         let errorMessage;
@@ -361,7 +420,11 @@
                         }
                         reject(errorMessage);
                     },
-                    { timeout: 10000, enableHighAccuracy: true }
+                    { 
+                        enableHighAccuracy: true,
+                        timeout: 10000,
+                        maximumAge: 600000 // 10 минут
+                    }
                 );
             });
         }
@@ -369,7 +432,6 @@
         // Функция для получения данных о погоде
         async function fetchWeatherData(latitude, longitude) {
             try {
-                // Формируем URL для запроса
                 const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=temperature_2m,precipitation_probability,rain,showers&timezone=auto&forecast_days=2`;
                 
                 const response = await fetch(url);
@@ -386,6 +448,9 @@
         
         // Функция для отображения данных о погоде
         async function displayWeatherData(weatherData) {
+            // Обновляем информацию о точности
+            updateAccuracyDisplay(locationAccuracy);
+            
             // Получаем название населенного пункта
             const locationName = await getLocationName(userLatitude, userLongitude);
             locationNameElement.textContent = locationName;
@@ -440,7 +505,7 @@
             }
             precipitationDescElement.textContent = precipitationDesc;
             
-            // Подготавливаем данные для графика (21 точка: 10 назад + сейчас + 10 вперед)
+            // Подготавливаем данные для графика
             const startIndex = Math.max(0, currentTimeIndex - 10);
             const endIndex = Math.min(hourly.time.length - 1, currentTimeIndex + 10);
             
@@ -579,11 +644,10 @@
         // Функция для обновления данных
         async function updateWeatherData() {
             try {
-                if (!userLatitude || !userLongitude) {
-                    const location = await getUserLocation();
-                    userLatitude = location.latitude;
-                    userLongitude = location.longitude;
-                }
+                const location = await getUserLocation();
+                userLatitude = location.latitude;
+                userLongitude = location.longitude;
+                locationAccuracy = location.accuracy;
                 
                 const weatherData = await fetchWeatherData(userLatitude, userLongitude);
                 await displayWeatherData(weatherData);
@@ -598,9 +662,12 @@
             try {
                 // Получаем местоположение пользователя
                 const location = await getUserLocation();
+                userLatitude = location.latitude;
+                userLongitude = location.longitude;
+                locationAccuracy = location.accuracy;
                 
                 // Получаем данные о погоде
-                const weatherData = await fetchWeatherData(location.latitude, location.longitude);
+                const weatherData = await fetchWeatherData(userLatitude, userLongitude);
                 
                 // Отображаем данные о погоде
                 await displayWeatherData(weatherData);
