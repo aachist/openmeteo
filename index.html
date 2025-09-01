@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Метео-дашборд</title>
+    <title>Погода в районе</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * {
@@ -42,17 +42,21 @@
             margin-bottom: 3px;
         }
         
-        .current-weather-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            flex-shrink: 0;
+        .location-name {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 8px;
+            border-radius: 8px;
+            backdrop-filter: blur(8px);
         }
         
-        @media (max-width: 768px) {
-            .current-weather-row {
-                grid-template-columns: 1fr;
-            }
+        .current-weather-row {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+            flex-shrink: 0;
         }
         
         .card {
@@ -77,25 +81,47 @@
             min-height: 0;
         }
         
-        .location-card {
-            flex-shrink: 0;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            padding: 10px;
+        .precipitation-info {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            margin-top: 10px;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+        }
+        
+        .precipitation-item {
+            text-align: center;
+        }
+        
+        .precipitation-value {
+            font-size: 1.4rem;
+            font-weight: bold;
+        }
+        
+        .precipitation-desc {
+            font-size: 0.9rem;
+            opacity: 0.9;
         }
         
         @media (max-width: 480px) {
-            .location-card {
-                grid-template-columns: 1fr;
-            }
-            
             body {
                 font-size: 12px;
             }
             
             h1 {
                 font-size: 1.2rem;
+            }
+            
+            .location-name {
+                font-size: 1rem;
+            }
+            
+            .precipitation-info {
+                flex-direction: column;
+                gap: 8px;
             }
         }
         
@@ -114,23 +140,6 @@
             text-align: center;
             display: none;
             grid-column: 1 / -1;
-            font-size: 0.9rem;
-        }
-        
-        .precipitation-value {
-            font-size: 1.6rem;
-            font-weight: bold;
-            margin: 3px 0;
-            text-align: center;
-            flex: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        .precipitation-desc {
-            text-align: center;
-            opacity: 0.9;
             font-size: 0.9rem;
         }
         
@@ -197,8 +206,8 @@
 <body>
     <div class="container">
         <header>
-            <h1>🌤️ Метео-дашборд</h1>
-            <p>Актуальная погода в вашем местоположении</p>
+            <h1>Погода в районе</h1>
+            <div class="location-name" id="location-name">Определение местоположения...</div>
         </header>
         
         <div class="loading" id="loading">
@@ -208,7 +217,7 @@
         <div class="error" id="error"></div>
         
         <div id="weather-data" style="display: none;">
-            <!-- Первая строка: текущая температура и осадки -->
+            <!-- Первая строка: текущая температура -->
             <div class="current-weather-row">
                 <div class="card">
                     <h2>🌡️ Текущая температура</h2>
@@ -217,40 +226,22 @@
                         <div class="weather-desc" id="current-desc">Обновление...</div>
                     </div>
                 </div>
-                
-                <div class="card">
-                    <h2>🌧️ Осадки в ближайший час</h2>
-                    <div class="precipitation-value" id="precipitation-value">0%</div>
-                    <div class="precipitation-desc" id="precipitation-desc">Небольшой дождь</div>
-                </div>
             </div>
             
-            <!-- Вторая строка: график температуры -->
+            <!-- Вторая строка: график температуры с информацией об осадках -->
             <div class="card chart-card">
-                <h2>📈 Температура (°C) - 10 часов назад → 10 часов вперед</h2>
+                <h2>📈 Температура и осадки - 10 часов назад → 10 часов вперед</h2>
                 <div class="chart-container">
                     <canvas id="temperature-chart"></canvas>
                 </div>
-            </div>
-            
-            <!-- Третья строка: местоположение -->
-            <div class="card location-card">
-                <h2 style="grid-column: 1 / -1;">📍 Местоположение</h2>
-                <div class="info-item">
-                    <div>Широта</div>
-                    <div class="info-value" id="latitude">0</div>
-                </div>
-                <div class="info-item">
-                    <div>Долгота</div>
-                    <div class="info-value" id="longitude">0</div>
-                </div>
-                <div class="info-item">
-                    <div>Высота</div>
-                    <div class="info-value" id="elevation">0 м</div>
-                </div>
-                <div class="info-item">
-                    <div>Часовой пояс</div>
-                    <div class="info-value" id="timezone">UTC</div>
+                <div class="precipitation-info" id="precipitation-info">
+                    <div class="precipitation-item">
+                        <div class="precipitation-value" id="precipitation-value">0%</div>
+                        <div class="precipitation-desc">Вероятность осадков</div>
+                    </div>
+                    <div class="precipitation-item">
+                        <div class="precipitation-desc" id="precipitation-desc">Небольшой дождь</div>
+                    </div>
                 </div>
             </div>
             
@@ -264,10 +255,7 @@
         const loadingElement = document.getElementById('loading');
         const errorElement = document.getElementById('error');
         const weatherDataElement = document.getElementById('weather-data');
-        const latitudeElement = document.getElementById('latitude');
-        const longitudeElement = document.getElementById('longitude');
-        const elevationElement = document.getElementById('elevation');
-        const timezoneElement = document.getElementById('timezone');
+        const locationNameElement = document.getElementById('location-name');
         const currentTempElement = document.getElementById('current-temp');
         const currentDescElement = document.getElementById('current-desc');
         const precipitationValueElement = document.getElementById('precipitation-value');
@@ -281,6 +269,54 @@
         let temperatureChart = null;
         let refreshInterval = null;
         let currentTimeIndex = null;
+        
+        // Функция для получения названия населенного пункта по координатам
+        async function getLocationName(latitude, longitude) {
+            try {
+                const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10&addressdetails=1`;
+                
+                const response = await fetch(url, {
+                    headers: {
+                        'Accept-Language': 'ru-RU,ru;q=0.9,en;q=0.8'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Ошибка при получении названия местоположения');
+                }
+                
+                const data = await response.json();
+                
+                // Пытаемся получить наиболее подходящее название
+                let locationName = 'Неизвестное местоположение';
+                
+                if (data.address) {
+                    // Приоритеты для названий
+                    if (data.address.city) {
+                        locationName = data.address.city;
+                    } else if (data.address.town) {
+                        locationName = data.address.town;
+                    } else if (data.address.village) {
+                        locationName = data.address.village;
+                    } else if (data.address.hamlet) {
+                        locationName = data.address.hamlet;
+                    } else if (data.address.suburb) {
+                        locationName = data.address.suburb;
+                    } else if (data.address.county) {
+                        locationName = data.address.county;
+                    } else if (data.address.state) {
+                        locationName = data.address.state;
+                    } else if (data.address.country) {
+                        locationName = data.address.country;
+                    }
+                }
+                
+                return locationName;
+            } catch (error) {
+                console.error('Ошибка при получении названия местоположения:', error);
+                return 'Местоположение';
+            }
+        }
         
         // Функция для отображения ошибки
         function showError(message) {
@@ -349,12 +385,10 @@
         }
         
         // Функция для отображения данных о погоде
-        function displayWeatherData(weatherData) {
-            // Обновляем информацию о местоположении
-            latitudeElement.textContent = userLatitude.toFixed(4);
-            longitudeElement.textContent = userLongitude.toFixed(4);
-            elevationElement.textContent = `${weatherData.elevation} м`;
-            timezoneElement.textContent = weatherData.timezone;
+        async function displayWeatherData(weatherData) {
+            // Получаем название населенного пункта
+            const locationName = await getLocationName(userLatitude, userLongitude);
+            locationNameElement.textContent = locationName;
             
             // Получаем данные о погоде
             const { hourly } = weatherData;
@@ -396,13 +430,13 @@
             if (nextHourPrecipitation === 0) {
                 precipitationDesc = 'Осадков не ожидается';
             } else if (nextHourPrecipitation < 30) {
-                precipitationDesc = 'Небольшая вероятность';
+                precipitationDesc = 'Небольшая вероятность осадков';
             } else if (nextHourPrecipitation < 60) {
                 precipitationDesc = 'Возможны осадки';
             } else if (nextHourPrecipitation < 80) {
                 precipitationDesc = 'Вероятны осадки';
             } else {
-                precipitationDesc = 'Высокая вероятность';
+                precipitationDesc = 'Высокая вероятность осадков';
             }
             precipitationDescElement.textContent = precipitationDesc;
             
@@ -423,7 +457,7 @@
             });
             
             // Создаем специальный массив точек для выделения текущего времени
-            const currentPointIndex = currentTimeIndex - startIndex; // Индекс текущего времени в данных графика
+            const currentPointIndex = currentTimeIndex - startIndex;
             const pointBackgroundColors = Array(chartTemperatures.length).fill('rgba(255, 255, 255, 0.6)');
             const pointBorderColors = Array(chartTemperatures.length).fill('rgba(0, 0, 0, 0.5)');
             const pointRadiuses = Array(chartTemperatures.length).fill(2);
@@ -489,7 +523,6 @@
                                     size: 9
                                 },
                                 callback: function(value, index, values) {
-                                    // Показываем каждый второй тик для лучшей читаемости
                                     return index % 2 === 0 ? this.getLabelForValue(value) : '';
                                 }
                             }
@@ -515,7 +548,6 @@
                                     const timeIndex = startIndex + index;
                                     let label = `Температура: ${context.parsed.y}°C`;
                                     
-                                    // Добавляем метку "Сейчас" для текущего времени
                                     if (timeIndex === currentTimeIndex) {
                                         label += ' (Сейчас)';
                                     }
@@ -534,42 +566,6 @@
                     }
                 }
             });
-            
-            // Добавляем аннотацию "Сейчас" на график
-            if (temperatureChart && currentPointIndex >= 0) {
-                const meta = temperatureChart.getDatasetMeta(0);
-                if (meta.data[currentPointIndex]) {
-                    const point = meta.data[currentPointIndex];
-                    const annotation = {
-                        type: 'label',
-                        xValue: formattedTimes[currentPointIndex],
-                        yValue: chartTemperatures[currentPointIndex],
-                        content: ['Сейчас'],
-                        position: {
-                            x: 'center',
-                            y: 'top'
-                        },
-                        backgroundColor: 'rgba(255, 99, 132, 0.8)',
-                        color: 'white',
-                        font: {
-                            size: 11,
-                            weight: 'bold'
-                        },
-                        padding: 4,
-                        borderRadius: 4,
-                        xAdjust: 0,
-                        yAdjust: -20
-                    };
-                    
-                    // Добавляем аннотацию если плагин доступен
-                    if (temperatureChart.options.plugins.annotation) {
-                        temperatureChart.options.plugins.annotation.annotations = {
-                            nowLabel: annotation
-                        };
-                        temperatureChart.update();
-                    }
-                }
-            }
             
             // Обновляем время последнего обновления
             const updateTime = new Date();
@@ -590,11 +586,10 @@
                 }
                 
                 const weatherData = await fetchWeatherData(userLatitude, userLongitude);
-                displayWeatherData(weatherData);
+                await displayWeatherData(weatherData);
                 
             } catch (error) {
                 console.error('Ошибка при обновлении данных:', error);
-                // Не показываем ошибку пользователю при автообновлении, чтобы не мешать
             }
         }
         
@@ -608,9 +603,9 @@
                 const weatherData = await fetchWeatherData(location.latitude, location.longitude);
                 
                 // Отображаем данные о погоде
-                displayWeatherData(weatherData);
+                await displayWeatherData(weatherData);
                 
-                // Запускаем автообновление каждые 10 минут (600000 миллисекунд)
+                // Запускаем автообновление каждые 10 минут
                 refreshInterval = setInterval(updateWeatherData, 10 * 60 * 1000);
                 
                 // Показываем информацию о следующем обновлении
