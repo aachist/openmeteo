@@ -280,6 +280,7 @@
         let userLongitude = null;
         let temperatureChart = null;
         let refreshInterval = null;
+        let currentTimeIndex = null;
         
         // Функция для отображения ошибки
         function showError(message) {
@@ -360,7 +361,7 @@
             const now = new Date();
             
             // Находим индекс текущего часа в данных
-            const currentTimeIndex = hourly.time.findIndex(time => {
+            currentTimeIndex = hourly.time.findIndex(time => {
                 const timeDate = new Date(time);
                 return timeDate.getHours() === now.getHours() && 
                        timeDate.getDate() === now.getDate();
@@ -421,6 +422,21 @@
                 });
             });
             
+            // Создаем специальный массив точек для выделения текущего времени
+            const currentPointIndex = currentTimeIndex - startIndex; // Индекс текущего времени в данных графика
+            const pointBackgroundColors = Array(chartTemperatures.length).fill('rgba(255, 255, 255, 0.6)');
+            const pointBorderColors = Array(chartTemperatures.length).fill('rgba(0, 0, 0, 0.5)');
+            const pointRadiuses = Array(chartTemperatures.length).fill(2);
+            const pointHoverRadiuses = Array(chartTemperatures.length).fill(4);
+            
+            // Выделяем точку текущего времени
+            if (currentPointIndex >= 0 && currentPointIndex < pointBackgroundColors.length) {
+                pointBackgroundColors[currentPointIndex] = 'rgba(255, 99, 132, 1)';
+                pointBorderColors[currentPointIndex] = 'rgba(255, 255, 255, 1)';
+                pointRadiuses[currentPointIndex] = 6;
+                pointHoverRadiuses[currentPointIndex] = 8;
+            }
+            
             // Создаем или обновляем график
             const ctx = document.getElementById('temperature-chart').getContext('2d');
             
@@ -439,10 +455,10 @@
                         backgroundColor: 'rgba(255, 255, 255, 0.1)',
                         tension: 0.4,
                         fill: true,
-                        pointBackgroundColor: 'rgba(255, 255, 255, 1)',
-                        pointBorderColor: 'rgba(0, 0, 0, 0.5)',
-                        pointRadius: 2,
-                        pointHoverRadius: 4
+                        pointBackgroundColor: pointBackgroundColors,
+                        pointBorderColor: pointBorderColors,
+                        pointRadius: pointRadiuses,
+                        pointHoverRadius: pointHoverRadiuses
                     }]
                 },
                 options: {
@@ -492,6 +508,19 @@
                             },
                             bodyFont: {
                                 size: 11
+                            },
+                            callbacks: {
+                                label: function(context) {
+                                    const index = context.dataIndex;
+                                    const timeIndex = startIndex + index;
+                                    let label = `Температура: ${context.parsed.y}°C`;
+                                    
+                                    // Добавляем метку "Сейчас" для текущего времени
+                                    if (timeIndex === currentTimeIndex) {
+                                        label += ' (Сейчас)';
+                                    }
+                                    return label;
+                                }
                             }
                         }
                     },
@@ -505,6 +534,42 @@
                     }
                 }
             });
+            
+            // Добавляем аннотацию "Сейчас" на график
+            if (temperatureChart && currentPointIndex >= 0) {
+                const meta = temperatureChart.getDatasetMeta(0);
+                if (meta.data[currentPointIndex]) {
+                    const point = meta.data[currentPointIndex];
+                    const annotation = {
+                        type: 'label',
+                        xValue: formattedTimes[currentPointIndex],
+                        yValue: chartTemperatures[currentPointIndex],
+                        content: ['Сейчас'],
+                        position: {
+                            x: 'center',
+                            y: 'top'
+                        },
+                        backgroundColor: 'rgba(255, 99, 132, 0.8)',
+                        color: 'white',
+                        font: {
+                            size: 11,
+                            weight: 'bold'
+                        },
+                        padding: 4,
+                        borderRadius: 4,
+                        xAdjust: 0,
+                        yAdjust: -20
+                    };
+                    
+                    // Добавляем аннотацию если плагин доступен
+                    if (temperatureChart.options.plugins.annotation) {
+                        temperatureChart.options.plugins.annotation.annotations = {
+                            nowLabel: annotation
+                        };
+                        temperatureChart.update();
+                    }
+                }
+            }
             
             // Обновляем время последнего обновления
             const updateTime = new Date();
