@@ -229,6 +229,14 @@
         .accuracy-icon {
             font-size: 1.1rem;
         }
+        
+        .location-cache-info {
+            text-align: center;
+            font-size: 0.7rem;
+            opacity: 0.6;
+            margin-top: 2px;
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
@@ -246,6 +254,7 @@
                     <span>Метод: <span id="location-method">определяется</span></span>
                 </div>
             </div>
+            <div class="location-cache-info" id="location-cache-info"></div>
         </header>
         
         <div class="loading" id="loading">
@@ -298,6 +307,7 @@
         const accuracyMetersElement = document.getElementById('accuracy-meters');
         const locationMethodElement = document.getElementById('location-method');
         const accuracyValueElement = document.getElementById('accuracy-value');
+        const locationCacheInfoElement = document.getElementById('location-cache-info');
         const currentTempElement = document.getElementById('current-temp');
         const currentDescElement = document.getElementById('current-desc');
         const precipitationValueElement = document.getElementById('precipitation-value');
@@ -312,6 +322,38 @@
         let temperatureChart = null;
         let refreshInterval = null;
         let currentTimeIndex = null;
+        let isUsingCachedLocation = false;
+        
+        // Ключи для localStorage
+        const LOCATION_CACHE_KEY = 'weatherLocationCache';
+        const LOCATION_CACHE_TIME_KEY = 'weatherLocationCacheTime';
+        
+        // Функция для кеширования местоположения
+        function cacheLocation(latitude, longitude, accuracy) {
+            const cacheData = {
+                latitude: latitude,
+                longitude: longitude,
+                accuracy: accuracy,
+                timestamp: Date.now()
+            };
+            localStorage.setItem(LOCATION_CACHE_KEY, JSON.stringify(cacheData));
+        }
+        
+        // Функция для получения кешированного местоположения
+        function getCachedLocation() {
+            const cachedData = localStorage.getItem(LOCATION_CACHE_KEY);
+            if (!cachedData) return null;
+            
+            const locationData = JSON.parse(cachedData);
+            const cacheAge = Date.now() - locationData.timestamp;
+            
+            // Используем кеш, если ему меньше 2 часов
+            if (cacheAge < 2 * 60 * 60 * 1000) {
+                return locationData;
+            }
+            
+            return null;
+        }
         
         // Функция для определения метода локации по точности
         function getLocationMethod(accuracy) {
@@ -333,6 +375,13 @@
             locationMethodElement.textContent = getLocationMethod(accuracy);
             accuracyValueElement.className = 'accuracy-item ' + getAccuracyClass(accuracy);
             accuracyInfoElement.style.display = 'flex';
+            
+            // Показываем информацию об использовании кеша
+            if (isUsingCachedLocation) {
+                locationCacheInfoElement.textContent = 'Используются кешированные координаты';
+            } else {
+                locationCacheInfoElement.textContent = '';
+            }
         }
         
         // Функция для получения названия населенного пункта по координатам
@@ -385,8 +434,18 @@
         }
         
         // Функция для получения местоположения пользователя
-        function getUserLocation() {
+        function getUserLocation(useCache = true) {
             return new Promise((resolve, reject) => {
+                // Сначала проверяем кеш, если разрешено
+                if (useCache) {
+                    const cachedLocation = getCachedLocation();
+                    if (cachedLocation) {
+                        isUsingCachedLocation = true;
+                        resolve(cachedLocation);
+                        return;
+                    }
+                }
+                
                 if (!navigator.geolocation) {
                     reject('Геолокация не поддерживается вашим браузером');
                     return;
@@ -394,16 +453,34 @@
                 
                 navigator.geolocation.getCurrentPosition(
                     position => {
-                        userLatitude = position.coords.latitude;
-                        userLongitude = position.coords.longitude;
-                        locationAccuracy = position.coords.accuracy;
-                        resolve({ 
-                            latitude: userLatitude, 
-                            longitude: userLongitude,
-                            accuracy: locationAccuracy
-                        });
+                        const locationData = {
+                            latitude: position.coords.latitude,
+                            longitude: position.coords.longitude,
+                            accuracy: position.coords.accuracy,
+                            timestamp: Date.now()
+                        };
+                        
+                        // Кешируем полученные данные
+                        cacheLocation(
+                            locationData.latitude, 
+                            locationData.longitude, 
+                            locationData.accuracy
+                        );
+                        
+                        isUsingCachedLocation = false;
+                        resolve(locationData);
                     },
                     error => {
+                        // Если не удалось получить геолокацию, пробуем использовать кеш
+                        if (useCache) {
+                            const cachedLocation = getCachedLocation();
+                            if (cachedLocation) {
+                                isUsingCachedLocation = true;
+                                resolve(cachedLocation);
+                                return;
+                            }
+                        }
+                        
                         let errorMessage;
                         switch(error.code) {
                             case error.PERMISSION_DENIED:
@@ -423,7 +500,7 @@
                     { 
                         enableHighAccuracy: true,
                         timeout: 10000,
-                        maximumAge: 600000 // 10 минут
+                        maximumAge: 300000 // 5 минут - использовать кешированные данные не старше 5 минут
                     }
                 );
             });
@@ -644,7 +721,8 @@
         // Функция для обновления данных
         async function updateWeatherData() {
             try {
-                const location = await getUserLocation();
+                // При обновлении используем кешированные данные, если доступны
+                const location = await getUserLocation(true);
                 userLatitude = location.latitude;
                 userLongitude = location.longitude;
                 locationAccuracy = location.accuracy;
@@ -660,8 +738,8 @@
         // Основная функция инициализации
         async function initWeatherApp() {
             try {
-                // Получаем местоположение пользователя
-                const location = await getUserLocation();
+                // Получаем местоположение пользователя (с использованием кеша)
+                const location = await getUserLocation(true);
                 userLatitude = location.latitude;
                 userLongitude = location.longitude;
                 locationAccuracy = location.accuracy;
@@ -691,6 +769,14 @@
         window.addEventListener('resize', function() {
             if (temperatureChart) {
                 temperatureChart.resize();
+            }
+        });
+        
+        // Обработка события видимости страницы
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) {
+                // Страница снова стала активной, обновляем данные
+                updateWeatherData();
             }
         });
     </script>
