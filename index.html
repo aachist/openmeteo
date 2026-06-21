@@ -264,7 +264,6 @@
         <div class="error" id="error"></div>
         
         <div id="weather-data" style="display: none;">
-            <!-- Первая строка: текущая температура -->
             <div class="current-weather-row">
                 <div class="card">
                     <h2>🌡️ Текущая температура</h2>
@@ -275,7 +274,6 @@
                 </div>
             </div>
             
-            <!-- Вторая строка: график температуры с информацией об осадках -->
             <div class="card chart-card">
                 <h2>📈 Температура и осадки - 10 часов назад → 10 часов вперед</h2>
                 <div class="chart-container">
@@ -387,8 +385,8 @@
         // Функция для получения названия населенного пункта по координатам
         async function getLocationName(latitude, longitude) {
             try {
-                const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10&addressdetails=1`;
-                
+                // Добавлен параметр email согласно требованиям Nominatim
+                const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10&addressdetails=1&email=aachist@gmail.com`;
                 const response = await fetch(url, {
                     headers: {
                         'Accept-Language': 'ru-RU,ru;q=0.9,en;q=0.8'
@@ -482,6 +480,7 @@
                         }
                         
                         let errorMessage;
+                        
                         switch(error.code) {
                             case error.PERMISSION_DENIED:
                                 errorMessage = 'Доступ к геолокации запрещен. Разрешите доступ к геолокации в настройках браузера.';
@@ -495,6 +494,7 @@
                             default:
                                 errorMessage = 'Произошла неизвестная ошибка.';
                         }
+                        
                         reject(errorMessage);
                     },
                     { 
@@ -510,7 +510,6 @@
         async function fetchWeatherData(latitude, longitude) {
             try {
                 const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=temperature_2m,precipitation_probability,rain,showers&timezone=auto&forecast_days=2`;
-                
                 const response = await fetch(url);
                 
                 if (!response.ok) {
@@ -689,7 +688,6 @@
                                     const index = context.dataIndex;
                                     const timeIndex = startIndex + index;
                                     let label = `Температура: ${context.parsed.y}°C`;
-                                    
                                     if (timeIndex === currentTimeIndex) {
                                         label += ' (Сейчас)';
                                     }
@@ -723,6 +721,7 @@
             try {
                 // При обновлении используем кешированные данные, если доступны
                 const location = await getUserLocation(true);
+                
                 userLatitude = location.latitude;
                 userLongitude = location.longitude;
                 locationAccuracy = location.accuracy;
@@ -740,6 +739,7 @@
             try {
                 // Получаем местоположение пользователя (с использованием кеша)
                 const location = await getUserLocation(true);
+                
                 userLatitude = location.latitude;
                 userLongitude = location.longitude;
                 locationAccuracy = location.accuracy;
