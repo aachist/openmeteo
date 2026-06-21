@@ -177,14 +177,44 @@
             font-size: 1rem;
         }
         
+        /* Стили для диагностического окна ошибок */
         .error {
-            background-color: rgba(255, 0, 0, 0.2);
-            padding: 10px;
-            border-radius: 6px;
-            text-align: center;
+            background-color: rgba(244, 67, 54, 0.2);
+            border: 1px solid rgba(244, 67, 54, 0.5);
+            padding: 15px;
+            border-radius: 8px;
             display: none;
             grid-column: 1 / -1;
             font-size: 0.9rem;
+            color: #ffcdd2;
+            text-align: left;
+            max-width: 100%;
+            overflow-x: auto;
+        }
+        
+        .error-title {
+            font-weight: bold;
+            font-size: 1.05rem;
+            margin-bottom: 8px;
+            color: #fff;
+        }
+        
+        .diag-box {
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 6px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.8rem;
+        }
+        
+        .diag-line {
+            margin-bottom: 6px;
+            word-break: break-all;
+        }
+        
+        .diag-line strong {
+            color: #26d0ce;
         }
         
         .chart-container {
@@ -296,7 +326,6 @@
     </div>
 
     <script>
-        // Элементы DOM
         const loadingElement = document.getElementById('loading');
         const errorElement = document.getElementById('error');
         const weatherDataElement = document.getElementById('weather-data');
@@ -313,7 +342,6 @@
         const lastUpdatedElement = document.getElementById('last-updated');
         const refreshInfoElement = document.getElementById('refresh-info');
         
-        // Переменные для хранения данных
         let userLatitude = null;
         let userLongitude = null;
         let locationAccuracy = null;
@@ -322,11 +350,8 @@
         let currentTimeIndex = null;
         let isUsingCachedLocation = false;
         
-        // Ключи для localStorage
         const LOCATION_CACHE_KEY = 'weatherLocationCache';
-        const LOCATION_CACHE_TIME_KEY = 'weatherLocationCacheTime';
         
-        // Функция для кеширования местоположения
         function cacheLocation(latitude, longitude, accuracy) {
             const cacheData = {
                 latitude: latitude,
@@ -337,7 +362,6 @@
             localStorage.setItem(LOCATION_CACHE_KEY, JSON.stringify(cacheData));
         }
         
-        // Функция для получения кешированного местоположения
         function getCachedLocation() {
             const cachedData = localStorage.getItem(LOCATION_CACHE_KEY);
             if (!cachedData) return null;
@@ -345,7 +369,6 @@
             const locationData = JSON.parse(cachedData);
             const cacheAge = Date.now() - locationData.timestamp;
             
-            // Используем кеш, если ему меньше 2 часов
             if (cacheAge < 2 * 60 * 60 * 1000) {
                 return locationData;
             }
@@ -353,28 +376,24 @@
             return null;
         }
         
-        // Функция для определения метода локации по точности
         function getLocationMethod(accuracy) {
             if (accuracy <= 20) return 'GPS (высокая точность)';
             if (accuracy <= 100) return 'Wi-Fi/сети (средняя точность)';
             return 'IP-адрес (низкая точность)';
         }
         
-        // Функция для определения класса точности
         function getAccuracyClass(accuracy) {
             if (accuracy <= 20) return 'accuracy-good';
             if (accuracy <= 100) return 'accuracy-medium';
             return 'accuracy-low';
         }
         
-        // Функция для обновления отображения точности
         function updateAccuracyDisplay(accuracy) {
             accuracyMetersElement.textContent = accuracy.toFixed(0);
             locationMethodElement.textContent = getLocationMethod(accuracy);
             accuracyValueElement.className = 'accuracy-item ' + getAccuracyClass(accuracy);
             accuracyInfoElement.style.display = 'flex';
             
-            // Показываем информацию об использовании кеша
             if (isUsingCachedLocation) {
                 locationCacheInfoElement.textContent = 'Используются кешированные координаты';
             } else {
@@ -382,11 +401,35 @@
             }
         }
         
-        // Функция для получения названия населенного пункта по координатам
+        // Функция для вывода детальной диагностики
+        function showError(message, details = null) {
+            loadingElement.style.display = 'none';
+            errorElement.style.display = 'block';
+            
+            let html = `<div class="error-title">❌ Ошибка: ${message}</div>`;
+            
+            if (details) {
+                html += `
+                    <div class="diag-box">
+                        <div class="diag-line"><strong>Компонент:</strong> ${details.component || 'Неизвестно'}</div>
+                        <div class="diag-line"><strong>Тип события:</strong> ${details.type || 'General Error'}</div>
+                        <div class="diag-line"><strong>Целевой URL:</strong> ${details.url || 'Н/Д'}</div>
+                        <div class="diag-line"><strong>Браузер в сети:</strong> ${details.online ? 'Да' : 'Нет (Offline)'}</div>
+                        <div class="diag-line" style="margin-top: 8px; color: #ffeb3b;"><strong>Возможная причина:</strong> ${details.suggestion || ''}</div>
+                    </div>
+                `;
+            }
+            
+            errorElement.innerHTML = html;
+            
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+            }
+        }
+        
         async function getLocationName(latitude, longitude) {
+            const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10&addressdetails=1&email=aachist@gmail.com`;
             try {
-                // Добавлен параметр email согласно требованиям Nominatim
-                const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10&addressdetails=1&email=aachist@gmail.com`;
                 const response = await fetch(url, {
                     headers: {
                         'Accept-Language': 'ru-RU,ru;q=0.9,en;q=0.8'
@@ -394,12 +437,10 @@
                 });
                 
                 if (!response.ok) {
-                    throw new Error('Ошибка при получении названия местоположения');
+                    throw new Error(`HTTP статус ${response.status}`);
                 }
                 
                 const data = await response.json();
-                
-                // Пытаемся получить наиболее подходящее название
                 let locationName = 'Неизвестное местоположение';
                 
                 if (data.address) {
@@ -415,26 +456,38 @@
                 
                 return locationName;
             } catch (error) {
-                console.error('Ошибка при получении названия местоположения:', error);
-                return 'Местоположение';
+                console.error('Ошибка Nominatim OpenStreetMap:', error);
+                // Пробрасываем кастомный объект для перехвата в initWeatherApp
+                const diagErr = new Error(error.message);
+                diagErr.url = url;
+                diagErr.component = 'Nominatim OpenStreetMap (Геокодер)';
+                diagErr.type = error.name || 'FetchError';
+                throw diagErr;
             }
         }
         
-        // Функция для отображения ошибки
-        function showError(message) {
-            loadingElement.style.display = 'none';
-            errorElement.style.display = 'block';
-            errorElement.textContent = message;
-            
-            if (refreshInterval) {
-                clearInterval(refreshInterval);
+        async function fetchWeatherData(latitude, longitude) {
+            const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=temperature_2m,precipitation_probability,rain,showers&timezone=auto&forecast_days=2`;
+            try {
+                const response = await fetch(url);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP статус ${response.status}`);
+                }
+                
+                return await response.json();
+            } catch (error) {
+                // Создаем расширенное исключение с диагностическими свойствами
+                const diagErr = new Error(error.message);
+                diagErr.url = url;
+                diagErr.component = 'Open-Meteo API (Погодный сервер)';
+                diagErr.type = error.name || 'FetchError';
+                throw diagErr;
             }
         }
         
-        // Функция для получения местоположения пользователя
         function getUserLocation(useCache = true) {
             return new Promise((resolve, reject) => {
-                // Сначала проверяем кеш, если разрешено
                 if (useCache) {
                     const cachedLocation = getCachedLocation();
                     if (cachedLocation) {
@@ -445,7 +498,9 @@
                 }
                 
                 if (!navigator.geolocation) {
-                    reject('Геолокация не поддерживается вашим браузером');
+                    const err = new Error('Геолокация не поддерживается вашим браузером');
+                    err.component = 'Браузерный Geolocation API';
+                    reject(err);
                     return;
                 }
                 
@@ -458,18 +513,11 @@
                             timestamp: Date.now()
                         };
                         
-                        // Кешируем полученные данные
-                        cacheLocation(
-                            locationData.latitude, 
-                            locationData.longitude, 
-                            locationData.accuracy
-                        );
-                        
+                        cacheLocation(locationData.latitude, locationData.longitude, locationData.accuracy);
                         isUsingCachedLocation = false;
                         resolve(locationData);
                     },
                     error => {
-                        // Если не удалось получить геолокацию, пробуем использовать кеш
                         if (useCache) {
                             const cachedLocation = getCachedLocation();
                             if (cachedLocation) {
@@ -480,62 +528,51 @@
                         }
                         
                         let errorMessage;
-                        
                         switch(error.code) {
                             case error.PERMISSION_DENIED:
-                                errorMessage = 'Доступ к геолокации запрещен. Разрешите доступ к геолокации в настройках браузера.';
+                                errorMessage = 'Доступ к геолокации запрещен в настройках браузера/системы.';
                                 break;
                             case error.POSITION_UNAVAILABLE:
-                                errorMessage = 'Информация о местоположении недоступна.';
+                                errorMessage = 'Информация о местоположении недоступна устройствам.';
                                 break;
                             case error.TIMEOUT:
-                                errorMessage = 'Время запроса местоположения истекло.';
+                                errorMessage = 'Время ожидания ответа координат истекло.';
                                 break;
                             default:
-                                errorMessage = 'Произошла неизвестная ошибка.';
+                                errorMessage = 'Неизвестная ошибка определения координат.';
                         }
                         
-                        reject(errorMessage);
+                        const err = new Error(errorMessage);
+                        err.component = 'Браузерный Geolocation API';
+                        err.type = `GeoCode-${error.code}`;
+                        reject(err);
                     },
                     { 
                         enableHighAccuracy: true,
                         timeout: 10000,
-                        maximumAge: 300000 // 5 минут - использовать кешированные данные не старше 5 минут
+                        maximumAge: 300000
                     }
                 );
             });
         }
         
-        // Функция для получения данных о погоде
-        async function fetchWeatherData(latitude, longitude) {
-            try {
-                const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=temperature_2m,precipitation_probability,rain,showers&timezone=auto&forecast_days=2`;
-                const response = await fetch(url);
-                
-                if (!response.ok) {
-                    throw new Error(`Ошибка HTTP: ${response.status}`);
-                }
-                
-                return await response.json();
-            } catch (error) {
-                throw new Error(`Не удалось получить данные о погоде: ${error.message}`);
-            }
-        }
-        
-        // Функция для отображения данных о погоде
         async function displayWeatherData(weatherData) {
-            // Обновляем информацию о точности
             updateAccuracyDisplay(locationAccuracy);
             
-            // Получаем название населенного пункта
-            const locationName = await getLocationName(userLatitude, userLongitude);
+            // Если геокодер упадет, поймаем ошибку локально, чтобы не ломать график погоды
+            let locationName = 'Местоположение';
+            try {
+                locationName = await getLocationName(userLatitude, userLongitude);
+            } catch (geoError) {
+                console.warn("Не удалось определить имя локации через Nominatim, используем дефолт.");
+                // Выводим мини-лог в консоль для отладки Nominatim отдельно
+                console.dir(geoError);
+            }
             locationNameElement.textContent = locationName;
             
-            // Получаем данные о погоде
             const { hourly } = weatherData;
             const now = new Date();
             
-            // Находим индекс текущего часа в данных
             currentTimeIndex = hourly.time.findIndex(time => {
                 const timeDate = new Date(time);
                 return timeDate.getHours() === now.getHours() && 
@@ -543,15 +580,13 @@
             });
             
             if (currentTimeIndex === -1) {
-                showError('Не удалось найти текущие данные о погоде');
+                showError('Не удалось синхронизировать текущий час с массивом данных API.');
                 return;
             }
             
-            // Отображаем текущую температуру
             const currentTemp = hourly.temperature_2m[currentTimeIndex];
             currentTempElement.textContent = `${currentTemp}°C`;
             
-            // Определяем описание погоды
             let weatherDescription = "Ясно";
             if (hourly.rain && hourly.rain[currentTimeIndex] > 0) {
                 weatherDescription = "Дождь";
@@ -562,11 +597,9 @@
             }
             currentDescElement.textContent = weatherDescription;
             
-            // Получаем вероятность осадков в ближайший час
             const nextHourPrecipitation = hourly.precipitation_probability[currentTimeIndex];
             precipitationValueElement.textContent = `${nextHourPrecipitation}%`;
             
-            // Описание осадков на основе вероятности
             let precipitationDesc = '';
             if (nextHourPrecipitation === 0) {
                 precipitationDesc = 'Осадков не ожидается';
@@ -581,30 +614,23 @@
             }
             precipitationDescElement.textContent = precipitationDesc;
             
-            // Подготавливаем данные для графика
             const startIndex = Math.max(0, currentTimeIndex - 10);
             const endIndex = Math.min(hourly.time.length - 1, currentTimeIndex + 10);
             
             const chartTimes = hourly.time.slice(startIndex, endIndex + 1);
             const chartTemperatures = hourly.temperature_2m.slice(startIndex, endIndex + 1);
             
-            // Форматируем время для отображения на графике
             const formattedTimes = chartTimes.map(time => {
                 const date = new Date(time);
-                return date.toLocaleTimeString('ru-RU', { 
-                    hour: '2-digit', 
-                    minute: '2-digit'
-                });
+                return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
             });
             
-            // Создаем специальный массив точек для выделения текущего времени
             const currentPointIndex = currentTimeIndex - startIndex;
             const pointBackgroundColors = Array(chartTemperatures.length).fill('rgba(255, 255, 255, 0.6)');
             const pointBorderColors = Array(chartTemperatures.length).fill('rgba(0, 0, 0, 0.5)');
             const pointRadiuses = Array(chartTemperatures.length).fill(2);
             const pointHoverRadiuses = Array(chartTemperatures.length).fill(4);
             
-            // Выделяем точку текущего времени
             if (currentPointIndex >= 0 && currentPointIndex < pointBackgroundColors.length) {
                 pointBackgroundColors[currentPointIndex] = 'rgba(255, 99, 132, 1)';
                 pointBorderColors[currentPointIndex] = 'rgba(255, 255, 255, 1)';
@@ -612,9 +638,7 @@
                 pointHoverRadiuses[currentPointIndex] = 8;
             }
             
-            // Создаем или обновляем график
             const ctx = document.getElementById('temperature-chart').getContext('2d');
-            
             if (temperatureChart) {
                 temperatureChart.destroy();
             }
@@ -641,143 +665,100 @@
                     maintainAspectRatio: true,
                     scales: {
                         y: {
-                            beginAtZero: false,
-                            grid: {
-                                color: 'rgba(255, 255, 255, 0.1)'
-                            },
-                            ticks: {
-                                color: 'white',
-                                maxTicksLimit: 5,
-                                font: {
-                                    size: 10
-                                }
-                            }
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                            ticks: { color: 'white', maxTicksLimit: 5, font: { size: 10 } }
                         },
                         x: {
-                            grid: {
-                                color: 'rgba(255, 255, 255, 0.1)'
-                            },
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
                             ticks: {
                                 color: 'white',
                                 maxTicksLimit: 8,
-                                font: {
-                                    size: 9
-                                },
-                                callback: function(value, index, values) {
+                                font: { size: 9 },
+                                callback: function(value, index) {
                                     return index % 2 === 0 ? this.getLabelForValue(value) : '';
                                 }
                             }
                         }
                     },
                     plugins: {
-                        legend: {
-                            display: false
-                        },
+                        legend: { display: false },
                         tooltip: {
                             backgroundColor: 'rgba(0, 0, 0, 0.7)',
                             titleColor: 'white',
                             bodyColor: 'white',
-                            titleFont: {
-                                size: 11
-                            },
-                            bodyFont: {
-                                size: 11
-                            },
                             callbacks: {
                                 label: function(context) {
-                                    const index = context.dataIndex;
-                                    const timeIndex = startIndex + index;
                                     let label = `Температура: ${context.parsed.y}°C`;
-                                    if (timeIndex === currentTimeIndex) {
-                                        label += ' (Сейчас)';
-                                    }
+                                    if (startIndex + context.dataIndex === currentTimeIndex) label += ' (Сейчас)';
                                     return label;
                                 }
                             }
-                        }
-                    },
-                    layout: {
-                        padding: {
-                            top: 3,
-                            bottom: 3,
-                            left: 5,
-                            right: 5
                         }
                     }
                 }
             });
             
-            // Обновляем время последнего обновления
             const updateTime = new Date();
             lastUpdatedElement.textContent = `Обновлено: ${updateTime.toLocaleTimeString('ru-RU')}`;
-            
-            // Показываем данные о погоде
             loadingElement.style.display = 'none';
             weatherDataElement.style.display = 'grid';
         }
         
-        // Функция для обновления данных
         async function updateWeatherData() {
             try {
-                // При обновлении используем кешированные данные, если доступны
                 const location = await getUserLocation(true);
-                
                 userLatitude = location.latitude;
                 userLongitude = location.longitude;
                 locationAccuracy = location.accuracy;
                 
                 const weatherData = await fetchWeatherData(userLatitude, userLongitude);
                 await displayWeatherData(weatherData);
-                
             } catch (error) {
-                console.error('Ошибка при обновлении данных:', error);
+                console.error('Ошибка фонового автообновления:', error);
             }
         }
         
-        // Основная функция инициализации
         async function initWeatherApp() {
             try {
-                // Получаем местоположение пользователя (с использованием кеша)
                 const location = await getUserLocation(true);
-                
                 userLatitude = location.latitude;
                 userLongitude = location.longitude;
                 locationAccuracy = location.accuracy;
                 
-                // Получаем данные о погоде
                 const weatherData = await fetchWeatherData(userLatitude, userLongitude);
-                
-                // Отображаем данные о погоде
                 await displayWeatherData(weatherData);
                 
-                // Запускаем автообновление каждые 10 минут
                 refreshInterval = setInterval(updateWeatherData, 10 * 60 * 1000);
-                
-                // Показываем информацию о следующем обновлении
                 const nextUpdate = new Date(Date.now() + 10 * 60 * 1000);
                 refreshInfoElement.textContent = `Автообновление каждые 10 минут. Следующее: ${nextUpdate.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})}`;
                 
             } catch (error) {
-                showError(error.message);
+                // Формируем подсказку в зависимости от ошибки
+                let suggestion = 'Неизвестная ошибка сети.';
+                if (error.message.includes('fetch') || error.message.includes('NetworkError')) {
+                    suggestion = 'Сетевой запрос полностью заблокирован. Так как с VPN страница работает, домен API заблокирован вашим текущим интернет-провайдером, системным брандмауэром или локальным DNS-сервером.';
+                } else if (error.message.includes('статус')) {
+                    suggestion = 'Сервер принял запрос, но ответил технической ошибкой. Возможно, превышены лимиты или неверные параметры.';
+                }
+                
+                showError(error.message, {
+                    component: error.component || 'Общий модуль инициализации',
+                    type: error.type || error.name || 'RuntimeError',
+                    url: error.url || 'Н/Д',
+                    online: navigator.onLine,
+                    suggestion: suggestion
+                });
             }
         }
         
-        // Запускаем приложение при загрузке страницы
         document.addEventListener('DOMContentLoaded', initWeatherApp);
         
-        // Обработка изменения размера окна
         window.addEventListener('resize', function() {
-            if (temperatureChart) {
-                temperatureChart.resize();
-            }
+            if (temperatureChart) temperatureChart.resize();
         });
         
-        // Обработка события видимости страницы
         document.addEventListener('visibilitychange', function() {
-            if (!document.hidden) {
-                // Страница снова стала активной, обновляем данные
-                updateWeatherData();
-            }
+            if (!document.hidden) updateWeatherData();
         });
     </script>
 </body>
