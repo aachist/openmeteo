@@ -3,179 +3,781 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Погода по геолокации</title>
+    <title>Погода в районе</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
         body {
-            font-family: Arial, sans-serif;
-            max-width: 600px;
-            margin: 20px auto;
-            padding: 20px;
-            text-align: center;
-            background-color: #f5f5f5;
-        }
-        .card {
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-        .error-message {
-            color: #d32f2f;
-            background: #ffebee;
+            background: linear-gradient(135deg, #1a2980, #26d0ce);
+            color: #fff;
+            height: 100vh;
+            overflow: hidden;
             padding: 10px;
-            border-radius: 4px;
-            margin-top: 10px;
-            display: none;
+            font-size: 13px;
         }
+        
+        .container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            gap: 10px;
+        }
+        
+        header {
+            text-align: center;
+            padding: 5px 0;
+            flex-shrink: 0;
+        }
+        
+        h1 {
+            font-size: 1.4rem;
+            margin-bottom: 3px;
+        }
+        
+        .location-name {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 8px;
+            border-radius: 8px;
+            backdrop-filter: blur(8px);
+        }
+        
+        .accuracy-info {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin: 5px 0;
+            flex-wrap: wrap;
+        }
+        
+        .accuracy-item {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 6px 12px;
+            border-radius: 15px;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .accuracy-good {
+            background: rgba(76, 175, 80, 0.3);
+            border: 1px solid rgba(76, 175, 80, 0.5);
+        }
+        
+        .accuracy-medium {
+            background: rgba(255, 152, 0, 0.3);
+            border: 1px solid rgba(255, 152, 0, 0.5);
+        }
+        
+        .accuracy-low {
+            background: rgba(244, 67, 54, 0.3);
+            border: 1px solid rgba(244, 67, 54, 0.5);
+        }
+        
+        .current-weather-row {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+        
+        .card {
+            background-color: rgba(255, 255, 255, 0.1);
+            padding: 10px;
+            border-radius: 8px;
+            backdrop-filter: blur(8px);
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .card h2 {
+            margin-bottom: 8px;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .chart-card {
+            flex: 1;
+            min-height: 0;
+        }
+        
+        .precipitation-info {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            margin-top: 10px;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+        }
+        
+        .precipitation-item {
+            text-align: center;
+        }
+        
+        .precipitation-value {
+            font-size: 1.4rem;
+            font-weight: bold;
+        }
+        
+        .precipitation-desc {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+        
+        @media (max-width: 480px) {
+            body {
+                font-size: 12px;
+            }
+            
+            h1 {
+                font-size: 1.2rem;
+            }
+            
+            .location-name {
+                font-size: 1rem;
+            }
+            
+            .accuracy-info {
+                flex-direction: column;
+                gap: 8px;
+                align-items: center;
+            }
+            
+            .accuracy-item {
+                width: 100%;
+                justify-content: center;
+            }
+            
+            .precipitation-info {
+                flex-direction: column;
+                gap: 8px;
+            }
+        }
+        
         .loading {
-            color: #666;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            font-size: 1rem;
+        }
+        
+        .error {
+            background-color: rgba(244, 67, 54, 0.2);
+            border: 1px solid rgba(244, 67, 54, 0.5);
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+            grid-column: 1 / -1;
+            font-size: 0.9rem;
+            color: #ffcdd2;
+            text-align: left;
+            max-width: 100%;
+            overflow-x: auto;
+        }
+        
+        .error-title {
+            font-weight: bold;
+            font-size: 1.05rem;
+            margin-bottom: 8px;
+            color: #fff;
+        }
+        
+        .diag-box {
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 6px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.8rem;
+        }
+        
+        .diag-line {
+            margin-bottom: 6px;
+            word-break: break-all;
+        }
+        
+        .diag-line strong {
+            color: #26d0ce;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 100%;
+            min-height: 200px;
+        }
+        
+        .last-updated {
+            text-align: center;
+            font-size: 0.75rem;
+            opacity: 0.7;
+            margin-top: 3px;
+        }
+        
+        .current-weather {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+        }
+        
+        .temperature {
+            font-size: 1.8rem;
+            font-weight: bold;
+            margin: 3px 0;
+        }
+        
+        .weather-desc {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+        
+        .refresh-info {
+            text-align: center;
+            font-size: 0.7rem;
+            opacity: 0.6;
+            margin-top: 2px;
+        }
+        
+        .accuracy-icon {
+            font-size: 1.1rem;
+        }
+        
+        .location-cache-info {
+            text-align: center;
+            font-size: 0.7rem;
+            opacity: 0.6;
+            margin-top: 2px;
             font-style: italic;
         }
     </style>
 </head>
 <body>
-
-    <div class="card">
-        <h2>Погода в вашем районе</h2>
-        <p id="location" class="loading">Определение местоположения...</p>
-        <div id="weather-info">
-            <p id="temperature">-- °C</p>
-            <p id="description">Ожидание данных...</p>
+    <div class="container">
+        <header>
+            <h1>Погода в районе</h1>
+            <div class="location-name" id="location-name">Определение местоположения...</div>
+            <div class="accuracy-info" id="accuracy-info" style="display: none;">
+                <div class="accuracy-item" id="accuracy-value">
+                    <span class="accuracy-icon">🎯</span>
+                    <span>Точность: <span id="accuracy-meters">0</span> м</span>
+                </div>
+                <div class="accuracy-item" id="accuracy-type">
+                    <span class="accuracy-icon">📡</span>
+                    <span>Метод: <span id="location-method">определяется</span></span>
+                </div>
+            </div>
+            <div class="location-cache-info" id="location-cache-info"></div>
+        </header>
+        
+        <div class="loading" id="loading">
+            Определяем ваше местоположение...
         </div>
-        <div id="error-block" class="error-message"></div>
+        
+        <div class="error" id="error"></div>
+        
+        <div id="weather-data" style="display: none;">
+            <div class="current-weather-row">
+                <div class="card">
+                    <h2>🌡️ Текущая температура</h2>
+                    <div class="current-weather">
+                        <div class="temperature" id="current-temp">0°C</div>
+                        <div class="weather-desc" id="current-desc">Обновление...</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card chart-card">
+                <h2>📈 Температура и осадки - 10 часов назад → 10 часов вперед</h2>
+                <div class="chart-container">
+                    <canvas id="temperature-chart"></canvas>
+                </div>
+                <div class="precipitation-info" id="precipitation-info">
+                    <div class="precipitation-item">
+                        <div class="precipitation-value" id="precipitation-value">0%</div>
+                        <div class="precipitation-desc">Вероятность осадков</div>
+                    </div>
+                    <div class="precipitation-item">
+                        <div class="precipitation-desc" id="precipitation-desc">Небольшой дождь</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="last-updated" id="last-updated"></div>
+            <div class="refresh-info" id="refresh-info">Автообновление каждые 10 минут</div>
+        </div>
     </div>
 
     <script>
-        // ВСТАВЬТЕ СЮДА ВАШ КЛЮЧ ИЗ ЛИЧНОГО КАБИНЕТА VISUAL CROSSING
-        const VISUAL_CROSSING_KEY = 'H8KTJB7C5F7YBMH5UT7U84RE6'; 
-
-        // Инициализация при загрузке страницы
-        window.onload = function() {
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(successPosition, errorPosition, {
-                    enableHighAccuracy: true,
-                    timeout: 10000
-                });
+        const loadingElement = document.getElementById('loading');
+        const errorElement = document.getElementById('error');
+        const weatherDataElement = document.getElementById('weather-data');
+        const locationNameElement = document.getElementById('location-name');
+        const accuracyInfoElement = document.getElementById('accuracy-info');
+        const accuracyMetersElement = document.getElementById('accuracy-meters');
+        const locationMethodElement = document.getElementById('location-method');
+        const accuracyValueElement = document.getElementById('accuracy-value');
+        const locationCacheInfoElement = document.getElementById('location-cache-info');
+        const currentTempElement = document.getElementById('current-temp');
+        const currentDescElement = document.getElementById('current-desc');
+        const precipitationValueElement = document.getElementById('precipitation-value');
+        const precipitationDescElement = document.getElementById('precipitation-desc');
+        const lastUpdatedElement = document.getElementById('last-updated');
+        const refreshInfoElement = document.getElementById('refresh-info');
+        
+        let userLatitude = null;
+        let userLongitude = null;
+        let locationAccuracy = null;
+        let temperatureChart = null;
+        let refreshInterval = null;
+        let currentTimeIndex = null;
+        let isUsingCachedLocation = false;
+        
+        const LOCATION_CACHE_KEY = 'weatherLocationCache';
+        
+        function cacheLocation(latitude, longitude, accuracy) {
+            const cacheData = {
+                latitude: latitude,
+                longitude: longitude,
+                accuracy: accuracy,
+                timestamp: Date.now()
+            };
+            localStorage.setItem(LOCATION_CACHE_KEY, JSON.stringify(cacheData));
+        }
+        
+        function getCachedLocation() {
+            const cachedData = localStorage.getItem(LOCATION_CACHE_KEY);
+            if (!cachedData) return null;
+            
+            const locationData = JSON.parse(cachedData);
+            const cacheAge = Date.now() - locationData.timestamp;
+            
+            if (cacheAge < 2 * 60 * 60 * 1000) {
+                return locationData;
+            }
+            return null;
+        }
+        
+        function getLocationMethod(accuracy) {
+            if (accuracy <= 20) return 'GPS (высокая точность)';
+            if (accuracy <= 100) return 'Wi-Fi/сети (средняя точность)';
+            return 'IP-адрес (низкая точность)';
+        }
+        
+        function getAccuracyClass(accuracy) {
+            if (accuracy <= 20) return 'accuracy-good';
+            if (accuracy <= 100) return 'accuracy-medium';
+            return 'accuracy-low';
+        }
+        
+        function updateAccuracyDisplay(accuracy) {
+            accuracyMetersElement.textContent = accuracy.toFixed(0);
+            locationMethodElement.textContent = getLocationMethod(accuracy);
+            accuracyValueElement.className = 'accuracy-item ' + getAccuracyClass(accuracy);
+            accuracyInfoElement.style.display = 'flex';
+            
+            if (isUsingCachedLocation) {
+                locationCacheInfoElement.textContent = 'Используются кешированные координаты';
             } else {
-                showError("Ваш браузер не поддерживает определение местоположения.");
-            }
-        };
-
-        // Обработка успешного получения координат GPS
-        async function successPosition(position) {
-            const latitude = position.coords.latitude;
-            const longitude = position.coords.longitude;
-
-            // 1. Получаем понятное название города/района
-            const locationName = await getLocationName(latitude, longitude);
-            document.getElementById('location').innerText = locationName;
-            document.getElementById('location').classList.remove('loading');
-
-            // 2. Получаем погоду через новый стабильный сервис
-            await getWeather(latitude, longitude);
-        }
-
-        // Ошибка самого GPS на телефоне
-        function errorPosition(error) {
-            document.getElementById('location').classList.remove('loading');
-            switch(error.code) {
-                case error.PERMISSION_DENIED:
-                    showError("Доступ к геолокации запрещен. Пожалуйста, разрешите доступ в настройках телефона/браузера.");
-                    break;
-                case error.POSITION_UNAVAILABLE:
-                    showError("Не удалось определить координаты. Проверьте, включен ли GPS.");
-                    break;
-                case error.TIMEOUT:
-                    showError("Время ожидания координат истекло. Попробуйте обновить страницу.");
-                    break;
-                default:
-                    showError("Произошла неизвестная ошибка при определении локации.");
+                locationCacheInfoElement.textContent = '';
             }
         }
-
-        // Запрос названия места (Исправлены кавычки, добавлен Email и User-Agent)
+        
+        function showError(message, details = null) {
+            loadingElement.style.display = 'none';
+            errorElement.style.display = 'block';
+            
+            let html = `<div class="error-title">❌ Ошибка: ${message}</div>`;
+            
+            if (details) {
+                html += `
+                    <div class="diag-box">
+                        <div class="diag-line"><strong>Компонент:</strong> ${details.component || 'Неизвестно'}</div>
+                        <div class="diag-line"><strong>Тип события:</strong> ${details.type || 'General Error'}</div>
+                        <div class="diag-line"><strong>Целевой URL:</strong> ${details.url || 'Н/Д'}</div>
+                        <div class="diag-line"><strong>Браузер в сети:</strong> ${details.online ? 'Да' : 'Нет (Offline)'}</div>
+                        <div class="diag-line" style="margin-top: 8px; color: #ffeb3b;"><strong>Возможная причина:</strong> ${details.suggestion || ''}</div>
+                    </div>
+                `;
+            }
+            
+            errorElement.innerHTML = html;
+            
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+            }
+        }
+        
         async function getLocationName(latitude, longitude) {
+            const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10&addressdetails=1&email=aachist@gmail.com`;
             try {
-                const url = `https://openstreetmap.org{latitude}&lon=${longitude}&zoom=10&addressdetails=1&email=aachist@gmail.com`;
-                
                 const response = await fetch(url, {
                     headers: {
-                        'User-Agent': 'WeatherApp_aachist',
-                        'Accept-Language': 'ru-RU, ru;q=0.9,en;q=0.8'
+                        'Accept-Language': 'ru-RU,ru;q=0.9,en;q=0.8'
                     }
                 });
-
+                
                 if (!response.ok) {
-                    throw new Error('Не удалось связаться с сервером имён.');
+                    throw new Error(`HTTP статус ${response.status}`);
                 }
-
+                
                 const data = await response.json();
                 let locationName = 'Неизвестное местоположение';
-
+                
                 if (data.address) {
                     if (data.address.city) locationName = data.address.city;
                     else if (data.address.town) locationName = data.address.town;
                     else if (data.address.village) locationName = data.address.village;
+                    else if (data.address.hamlet) locationName = data.address.hamlet;
                     else if (data.address.suburb) locationName = data.address.suburb;
                     else if (data.address.county) locationName = data.address.county;
                     else if (data.address.state) locationName = data.address.state;
                     else if (data.address.country) locationName = data.address.country;
                 }
+                
                 return locationName;
-
             } catch (error) {
-                console.error('Ошибка Nominatim:', error);
-                return 'Ваш район (город)';
+                console.error('Ошибка Nominatim OpenStreetMap:', error);
+                const diagErr = new Error(error.message);
+                diagErr.url = url;
+                diagErr.component = 'Nominatim OpenStreetMap (Геокодер)';
+                diagErr.type = error.name || 'FetchError';
+                throw diagErr;
             }
         }
-
-        // Запрос погоды через Visual Crossing (Работает без VPN!)
-        async function getWeather(latitude, longitude) {
+        
+        // ОБНОВЛЕННАЯ ФУНКЦИЯ ДЛЯ РАБОТЫ С VISUAL CROSSING WEATHER
+        async function fetchWeatherData(latitude, longitude) {
+            const apiKey = 'H8KTJB7C5F7YBMH5UT7U84RE6';
+            const url = `https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/${latitude},${longitude}?unitGroup=metric&key=${apiKey}&contentType=json&include=hours`;
+            
             try {
-                if (VISUAL_CROSSING_KEY === 'ВАШ_КЛЮЧ_VISUAL_CROSSING') {
-                    throw new Error("Необходимо указать настоящий API-ключ в коде скрипта.");
-                }
-
-                // Запрос к Visual Crossing API с флагом метрической системы (Celsius) и языком (ru)
-            const url = `https://visualcrossing.com{latitude},${longitude}?unitGroup=metric&key=${VISUAL_CROSSING_KEY}&contentType=json&lang=ru`;
-
-
-
                 const response = await fetch(url);
                 
                 if (!response.ok) {
-                    if (response.status === 401 || response.status === 403) {
-                        throw new Error("Неверный ключ API Visual Crossing. Проверьте его в коде.");
-                    }
-                    throw new Error(`Ошибка сервера погоды: Статус ${response.status}`);
+                    throw new Error(`HTTP статус ${response.status}: ${response.statusText}`);
                 }
-
-                const data = await response.json();
                 
-                // Выводим данные текущей погоды на экран
-                const currentConditions = data.currentConditions;
-                document.getElementById('temperature').innerText = `${Math.round(currentConditions.temp)} °C`;
-                document.getElementById('description').innerText = currentConditions.conditions;
+                const rawData = await response.json();
                 
-                // Скрываем блок ошибки, если данные успешно получены
-                document.getElementById('error-block').style.display = 'none';
-
+                // Адаптер структуры под старый формат Open-Meteo
+                const adaptedHourly = {
+                    time: [],
+                    temperature_2m: [],
+                    precipitation_probability: [],
+                    rain: [],
+                    showers: []
+                };
+                
+                // Нам нужны данные на сегодня и завтра (первые 2 дня из прогноза)
+                const daysToProcess = rawData.days.slice(0, 2);
+                daysToProcess.forEach(day => {
+                    if (day.hours) {
+                        day.hours.forEach(hour => {
+                            // Формируем формат даты YYYY-MM-DDTHH:mm:ss для корректного парсинга в Date()
+                            adaptedHourly.time.push(`${day.datetime}T${hour.datetime}`);
+                            adaptedHourly.temperature_2m.push(hour.temp);
+                            adaptedHourly.precipitation_probability.push(hour.precipprob !== null ? hour.precipprob : 0);
+                            adaptedHourly.rain.push(hour.precip !== null ? hour.precip : 0);
+                            adaptedHourly.showers.push(0); // В Visual Crossing ливни входят в общий параметр precip
+                        });
+                    }
+                });
+                
+                return { hourly: adaptedHourly };
+                
             } catch (error) {
-                console.error('Ошибка получения погоды:', error);
-                showError(`Не удалось получить данные о погоде: ${error.message}`);
+                const diagErr = new Error(error.message);
+                diagErr.url = `https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/${latitude},${longitude}...`;
+                diagErr.component = 'Visual Crossing Weather API (Погодный сервер)';
+                diagErr.type = error.name || 'FetchError';
+                throw diagErr;
             }
         }
-
-        // Функция красивого вывода ошибок на экран
-        function showError(message) {
-            const errorBlock = document.getElementById('error-block');
-            errorBlock.innerText = message;
-            errorBlock.style.display = 'block';
-            
-            // Сбрасываем интерфейс в дефолтное состояние
-            document.getElementById('temperature').innerText = "-- °C";
-            document.getElementById('description').innerText = "Ошибка загрузки";
+        
+        function getUserLocation(useCache = true) {
+            return new Promise((resolve, reject) => {
+                if (useCache) {
+                    const cachedLocation = getCachedLocation();
+                    if (cachedLocation) {
+                        isUsingCachedLocation = true;
+                        resolve(cachedLocation);
+                        return;
+                    }
+                }
+                
+                if (!navigator.geolocation) {
+                    const err = new Error('Геолокация не поддерживается вашим браузером');
+                    err.component = 'Браузерный Geolocation API';
+                    reject(err);
+                    return;
+                }
+                
+                navigator.geolocation.getCurrentPosition(
+                    position => {
+                        const locationData = {
+                            latitude: position.coords.latitude,
+                            longitude: position.coords.longitude,
+                            accuracy: position.coords.accuracy,
+                            timestamp: Date.now()
+                        };
+                        cacheLocation(locationData.latitude, locationData.longitude, locationData.accuracy);
+                        isUsingCachedLocation = false;
+                        resolve(locationData);
+                    },
+                    error => {
+                        if (useCache) {
+                            const cachedLocation = getCachedLocation();
+                            if (cachedLocation) {
+                                isUsingCachedLocation = true;
+                                resolve(cachedLocation);
+                                return;
+                            }
+                        }
+                        
+                        let errorMessage;
+                        switch(error.code) {
+                            case error.PERMISSION_DENIED:
+                                errorMessage = 'Доступ к геолокации запрещен в настройках браузера/системы.';
+                                break;
+                            case error.POSITION_UNAVAILABLE:
+                                errorMessage = 'Информация о местоположении недоступна устройствам.';
+                                break;
+                            case error.TIMEOUT:
+                                errorMessage = 'Время ожидания ответа координат истекло.';
+                                break;
+                            default:
+                                errorMessage = 'Неизвестная ошибка определения координат.';
+                        }
+                        
+                        const err = new Error(errorMessage);
+                        err.component = 'Браузерный Geolocation API';
+                        err.type = `GeoCode-${error.code}`;
+                        reject(err);
+                    },
+                    { 
+                        enableHighAccuracy: true,
+                        timeout: 10000,
+                        maximumAge: 300000
+                    }
+                );
+            });
         }
+        
+        async function displayWeatherData(weatherData) {
+            updateAccuracyDisplay(locationAccuracy);
+            
+            let locationName = 'Местоположение';
+            try {
+                locationName = await getLocationName(userLatitude, userLongitude);
+            } catch (geoError) {
+                console.warn("Не удалось определить имя локации через Nominatim, используем координаты.");
+            }
+            locationNameElement.textContent = locationName;
+            
+            const { hourly } = weatherData;
+            const now = new Date();
+            
+            currentTimeIndex = hourly.time.findIndex(time => {
+                const timeDate = new Date(time);
+                return timeDate.getHours() === now.getHours() && 
+                       timeDate.getDate() === now.getDate();
+            });
+            
+            if (currentTimeIndex === -1) {
+                showError('Не удалось синхронизировать текущий час с массивом данных нового API.');
+                return;
+            }
+            
+            const currentTemp = hourly.temperature_2m[currentTimeIndex];
+            currentTempElement.textContent = `${currentTemp}°C`;
+            
+            let weatherDescription = "Ясно";
+            if (hourly.rain && hourly.rain[currentTimeIndex] > 0) {
+                weatherDescription = "Осадки / Дождь";
+            } else if (hourly.precipitation_probability[currentTimeIndex] > 70) {
+                weatherDescription = "Облачно";
+            }
+            currentDescElement.textContent = weatherDescription;
+            
+            const nextHourPrecipitation = hourly.precipitation_probability[currentTimeIndex];
+            precipitationValueElement.textContent = `${nextHourPrecipitation}%`;
+            
+            let precipitationDesc = '';
+            if (nextHourPrecipitation === 0) {
+                precipitationDesc = 'Осадков не ожидается';
+            } else if (nextHourPrecipitation < 30) {
+                precipitationDesc = 'Небольшая вероятность осадков';
+            } else if (nextHourPrecipitation < 60) {
+                precipitationDesc = 'Возможны осадки';
+            } else if (nextHourPrecipitation < 80) {
+                precipitationDesc = 'Вероятны осадки';
+            } else {
+                precipitationDesc = 'Высокая вероятность осадков';
+            }
+            precipitationDescElement.textContent = precipitationDesc;
+            
+            const startIndex = Math.max(0, currentTimeIndex - 10);
+            const endIndex = Math.min(hourly.time.length - 1, currentTimeIndex + 10);
+            
+            const chartTimes = hourly.time.slice(startIndex, endIndex + 1);
+            const chartTemperatures = hourly.temperature_2m.slice(startIndex, endIndex + 1);
+            
+            const formattedTimes = chartTimes.map(time => {
+                const date = new Date(time);
+                return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+            });
+            
+            const currentPointIndex = currentTimeIndex - startIndex;
+            const pointBackgroundColors = Array(chartTemperatures.length).fill('rgba(255, 255, 255, 0.6)');
+            const pointBorderColors = Array(chartTemperatures.length).fill('rgba(0, 0, 0, 0.5)');
+            const pointRadiuses = Array(chartTemperatures.length).fill(2);
+            const pointHoverRadiuses = Array(chartTemperatures.length).fill(4);
+            
+            if (currentPointIndex >= 0 && currentPointIndex < pointBackgroundColors.length) {
+                pointBackgroundColors[currentPointIndex] = 'rgba(255, 99, 132, 1)';
+                pointBorderColors[currentPointIndex] = 'rgba(255, 255, 255, 1)';
+                pointRadiuses[currentPointIndex] = 6;
+                pointHoverRadiuses[currentPointIndex] = 8;
+            }
+            
+            const ctx = document.getElementById('temperature-chart').getContext('2d');
+            if (temperatureChart) {
+                temperatureChart.destroy();
+            }
+            
+            temperatureChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: formattedTimes,
+                    datasets: [{
+                        label: 'Температура (°C)',
+                        data: chartTemperatures,
+                        borderColor: 'rgba(255, 255, 255, 0.8)',
+                        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                        tension: 0.4,
+                        fill: true,
+                        pointBackgroundColor: pointBackgroundColors,
+                        pointBorderColor: pointBorderColors,
+                        pointRadius: pointRadiuses,
+                        pointHoverRadius: pointHoverRadiuses
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    scales: {
+                        y: {
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                            ticks: { color: 'white', maxTicksLimit: 5, font: { size: 10 } }
+                        },
+                        x: {
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                            ticks: {
+                                color: 'white',
+                                maxTicksLimit: 8,
+                                font: { size: 9 },
+                                callback: function(value, index) {
+                                    return index % 2 === 0 ? this.getLabelForValue(value) : '';
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                            titleColor: 'white',
+                            bodyColor: 'white',
+                            callbacks: {
+                                label: function(context) {
+                                    let label = `Температура: ${context.parsed.y}°C`;
+                                    if (startIndex + context.dataIndex === currentTimeIndex) label += ' (Сейчас)';
+                                    return label;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            
+            const updateTime = new Date();
+            lastUpdatedElement.textContent = `Обновлено: ${updateTime.toLocaleTimeString('ru-RU')}`;
+            loadingElement.style.display = 'none';
+            weatherDataElement.style.display = 'grid';
+        }
+        
+        async function updateWeatherData() {
+            try {
+                const location = await getUserLocation(true);
+                userLatitude = location.latitude;
+                userLongitude = location.longitude;
+                locationAccuracy = location.accuracy;
+                
+                const weatherData = await fetchWeatherData(userLatitude, userLongitude);
+                await displayWeatherData(weatherData);
+            } catch (error) {
+                console.error('Ошибка фонового автообновления:', error);
+            }
+        }
+        
+        async function initWeatherApp() {
+            try {
+                const location = await getUserLocation(true);
+                userLatitude = location.latitude;
+                userLongitude = location.longitude;
+                locationAccuracy = location.accuracy;
+                
+                const weatherData = await fetchWeatherData(userLatitude, userLongitude);
+                await displayWeatherData(weatherData);
+                
+                refreshInterval = setInterval(updateWeatherData, 10 * 60 * 1000);
+                const nextUpdate = new Date(Date.now() + 10 * 60 * 1000);
+                refreshInfoElement.textContent = `Автообновление каждые 10 минут. Следующее: ${nextUpdate.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})}`;
+                
+            } catch (error) {
+                let suggestion = 'Неизвестная ошибка сети.';
+                if (error.message.includes('fetch') || error.message.includes('NetworkError')) {
+                    suggestion = 'Сетевой запрос полностью заблокирован. Так как с VPN страница работает, домен API заблокирован вашим текущим интернет-провайдером, системным брандмауэром или локальным DNS-сервером.';
+                } else if (error.message.includes('статус')) {
+                    suggestion = 'Сервер принял запрос, но ответил технической ошибкой. Возможно, неверно указан API ключ Visual Crossing или превышены лимиты бесплатного тарифа.';
+                }
+                
+                showError(error.message, {
+                    component: error.component || 'Общий модуль инициализации',
+                    type: error.type || error.name || 'RuntimeError',
+                    url: error.url || 'Н/Д',
+                    online: navigator.onLine,
+                    suggestion: suggestion
+                });
+            }
+        }
+        
+        document.addEventListener('DOMContentLoaded', initWeatherApp);
+        
+        window.addEventListener('resize', function() {
+            if (temperatureChart) temperatureChart.resize();
+        });
+        
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) updateWeatherData();
+        });
     </script>
 </body>
 </html>
