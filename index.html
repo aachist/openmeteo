@@ -137,7 +137,8 @@
                 }
 
                 // Запрос к Visual Crossing API с флагом метрической системы (Celsius) и языком (ru)
-             const url = `https://visualcrossing.com{latitude},${longitude}?unitGroup=metric&key=${VISUAL_CROSSING_KEY}&contentType=json&lang=ru`;
+            const url = `https://visualcrossing.com{latitude},${longitude}?unitGroup=metric&key=${VISUAL_CROSSING_KEY}&contentType=json&lang=ru`;
+
 
 
                 const response = await fetch(url);
